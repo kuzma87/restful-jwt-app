@@ -1,0 +1,20 @@
+.home-page-container {
+    padding-top: 30px;
+}
+
+.authentication-token-div {
+    display: none;
+}
+
+.booking-form-div {
+    display: none;
+}
+
+.booking-form-div .room-div {
+    display: none;
+}
+
+.hotel-filter-div {
+    margin-bottom: 10px;
+    margin-top: 10px;
+}

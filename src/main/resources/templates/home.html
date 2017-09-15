@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head lang="en">
+    <title>Client Page</title>
+    <th:block th:include="fragments/include :: head"></th:block>
+    <!--tmp include  -->
+    <link href="../static/css/bootstrap.min.css"
+          th:href="@{/css/bootstrap.min.css}"
+          rel="stylesheet" media="screen"/>
+    <!--tmp include  -->
+</head>
+<body>
+<div class="home-page-container container" style="width: 96%">
+
+    <div class="row">
+
+        <div class="col-md-3">
+            <div class="log-in-div">
+                <div class="panel panel-info log-in-panel">
+                    <div class="panel-heading">Log in</div>
+                    <div class="panel-body">
+                        <form class="log-in-form">
+                            <div class="form-group">
+                                <label for="username">Username</label>
+                                <input type="text" class="form-control" id="username" value="user1"/>
+                            </div>
+                            <div class="form-group">
+                                <label for="password">Password</label>
+                                <input type="password" class="form-control" id="password" value="password"/>
+                            </div>
+                        </form>
+                        <button class="btn btn-primary" type="button" id="loginBtn">Log in</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="col-lg-9">
+
+            <div class="authentication-token-div">
+                <div class="panel panel-info">
+                    <div class="panel-heading">Authorization Header. Value from the input is used in each http
+                        request.
+                    </div>
+                    <div class="panel-body">
+                        <input type="text" class="form-control" id="authorizationToken"/>
+                    </div>
+                </div>
+            </div>
+
+            <div class="booking-form-div">
+                <div class="panel panel-info">
+                    <div class="panel-heading">Booking form</div>
+                    <div class="panel-body">
+                        <span style="font-weight: 700; ">Hotel filter:</span>
+                        <div class="form-inline hotel-filter-div">
+                            <div class="checkbox">
+                                <label>
+                                    <input type="checkbox" id="hasPool"/> Swimming pool
+                                </label>
+                            </div>
+                            <div class="checkbox">
+                                <label>
+                                    <input type="checkbox" id="hasSlides"/> Slides
+                                </label>
+                            </div>
+                            <div class="checkbox">
+                                <label>
+                                    <input type="checkbox" id="hasTennis"/> Tennis court
+                                </label>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="hotelSelect">Choose a hotel:</label>
+                            <select id="hotelSelect" class="form-control">
+                                <option value="" disabled="disabled" selected="selected">choose...</option>
+                            </select>
+                        </div>
+
+                        <div class="room-div">
+                            <div class="form-inline room-filter-div">
+                                <div class="checkbox">
+                                    <label>
+                                        <input type="checkbox" id="hasTv"/> TV
+                                    </label>
+                                </div>
+                                <div class="checkbox">
+                                    <label>
+                                        <input type="checkbox" id="hasBalcony"/> Balcony
+                                    </label>
+                                </div>
+                                <div class="checkbox">
+                                    <label>
+                                        <input type="checkbox" id="hasAirCond"/> Air conditioner
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="form-group room-select-div">
+                                <label for="roomSelect">Choose a room:</label>
+                                <select id="roomSelect" class="form-control">
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+</body>
+<script th:inline="javascript">
+    /* <![CDATA[ */
+    var authenticationToken;
+    var logInPanel = $('.log-in-panel');
+    var logInPanelTitle = $('.log-in-div .panel-heading');
+    var logInBtn = $('#loginBtn');
+    var usernameInput = $('#username');
+    var passwordInput = $('#password');
+    var authTokenDiv = $('.authentication-token-div');
+    var tokenInput = $('#authorizationToken');
+    var bookingFormDiv = $('.booking-form-div');
+    var hotelFilterDiv = $('.hotel-filter-div');
+    var roomFilterDiv = $('.room-filter-div');
+
+    $(function () {
+
+        logInBtn.click(function () {
+            logIn().done(function (data) {
+                logInPanel.removeClass('panel-info');
+                logInPanel.removeClass('panel-warning');
+                logInPanel.addClass('panel-success');
+                logInPanelTitle.text('Logged-in');
+                authenticationToken = 'Bearer ' + data.token;
+                tokenInput.val(authenticationToken);
+
+                getHotels(authenticationToken, '').done(function (data) {
+                    var hotelSelectBody = '';
+                    $.each(data, function (index, hotel) {
+                        hotelSelectBody += '<option value="' + hotel.id + '">' + hotel.name + '</option>';
+                    });
+                    bookingFormDiv.find('#hotelSelect').append(hotelSelectBody);
+                });
+
+                authTokenDiv.show();
+                bookingFormDiv.show();
+            }).fail(function (data) {
+                logInPanel.removeClass('panel-info');
+                logInPanel.removeClass('panel-success');
+                logInPanel.addClass('panel-warning');
+                logInPanelTitle.text('Authentication error');
+            });
+        });
+
+        bookingFormDiv.find('#hotelSelect').on('change', function () {
+            var optionSelected = $('option:selected', this);
+            var hotelSelected = optionSelected.val();
+
+            fillRoomSelect(hotelSelected, '');
+
+            bookingFormDiv.find('.room-div').show();
+        });
+
+        hotelFilterDiv.find('.checkbox input').on('change', function () {
+            var filterParams = '?';
+            var checkBoxes = hotelFilterDiv.find('.checkbox input');
+            $.each(checkBoxes, function (i, e) {
+                if (e.checked) {
+                    filterParams += e.id + '=true&';
+                }
+            });
+
+            if (filterParams.length > 1) {
+                getHotels(authenticationToken, filterParams.slice(0, -1)).done(function (data) {
+                    var hotelSelectBody = '';
+                    $.each(data, function (index, hotel) {
+                        hotelSelectBody += '<option value="' + hotel.id + '">' + hotel.name +
+                            ' (Swimming pool: ' + booleanToText(hotel.hasPool) +
+                            ' | Slides: ' + booleanToText(hotel.hasSlides) +
+                            ' | Tennis court: ' + booleanToText(hotel.hasTennis) +
+                            '</option>';
+                    });
+                    bookingFormDiv.find('#hotelSelect').find('option')
+                        .remove()
+                        .end()
+                        .append('<option value="" disabled="disabled" selected="selected">choose...</option>')
+                        .append(hotelSelectBody);
+                });
+            }
+        });
+
+        roomFilterDiv.find('.checkbox input').on('change', function () {
+            var filterParams = '?';
+            var checkBoxes = roomFilterDiv.find('.checkbox input');
+            $.each(checkBoxes, function (i, e) {
+                if (e.checked) {
+                    filterParams += e.id + '=true&';
+                }
+            });
+
+            var hotelId = bookingFormDiv.find('#hotelSelect option:selected').val();
+            fillRoomSelect(hotelId, filterParams.slice(0, -1));
+        });
+
+        function booleanToText(booleanValue) {
+            if (booleanValue) {
+                return 'Yes';
+            }
+            return 'No';
+        }
+
+        function logIn() {
+            return $.ajax({
+                url: '/token',
+                type: 'post',
+                contentType: 'application/json',
+                dataType: 'json',
+                data: JSON.stringify({username: usernameInput.val(), password: passwordInput.val()})
+            });
+        }
+
+        function getHotels(token, filter) {
+            var url = '/hotels';
+            if (filter.length > 1) {
+                url += filter;
+            }
+            return $.ajax({
+                url: url,
+                type: 'get',
+                beforeSend: function (request) {
+                    request.setRequestHeader('Authorization', token);
+                }
+            });
+        }
+
+        function getRooms(token, hotelId, filter) {
+            var url = '/hotels/' + hotelId + '/rooms';
+            if (filter.length > 1) {
+                url += filter;
+            }
+            return $.ajax({
+                url: url,
+                type: 'get',
+                beforeSend: function (request) {
+                    request.setRequestHeader('Authorization', token);
+                }
+            });
+        }
+
+        function fillRoomSelect(hotelSelected, filter) {
+            getRooms(authenticationToken, hotelSelected, filter).done(function (data) {
+                var roomSelectBody = '';
+                $.each(data, function (index, room) {
+                    roomSelectBody += '<option value="' + room.id + '">' +
+                        ' Room type: ' + room.type +
+                        ' | TV: ' + booleanToText(room.hasTv) +
+                        ' | Balcony: ' + booleanToText(room.hasBalcony) +
+                        ' | Air Conditioner: ' + booleanToText(room.hasAirCond) +
+                        '</option>';
+                });
+                bookingFormDiv.find('#roomSelect').find('option')
+                    .remove()
+                    .end()
+                    .append('<option value="" disabled="disabled" selected="selected">choose...</option>')
+                    .append(roomSelectBody);
+            });
+        }
+
+    });
+
+    /* ]]> */
+</script>
+</html>

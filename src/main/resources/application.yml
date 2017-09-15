@@ -1,0 +1,10 @@
+server:
+  port: 8883
+jwt:
+  header: Authorization
+  secret: mySecret
+  expiration: 1800
+  route:
+    authentication:
+      path: token
+      refresh: refresh
